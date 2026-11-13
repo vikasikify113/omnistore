@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OmniStore</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%9B%8D%EF%B8%8F%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #f5f6fa; --card: #ffffff; --ink: #0b1020; --muted: #5d667a; --line: #e4e7ef;
+    --navy: #090d16; --accent: #ff6b00; --accent-dark: #d95a00;
+    --ok: #12a150; --warn: #c78500; --bad: #d92d20; --info: #2563eb;
+    --radius: 14px; --shadow: 0 1px 2px rgba(11,16,32,.06), 0 4px 14px rgba(11,16,32,.06);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--ink); line-height: 1.45; }
+  button { font: inherit; cursor: pointer; }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid rgba(255,107,0,.45); outline-offset: 1px; }
+
+  /* ---------- header ---------- */
+  header { background: var(--navy); color: #fff; position: sticky; top: 0; z-index: 30; }
+  .bar { max-width: 1440px; margin: 0 auto; padding: 12px 20px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  .logo { font-weight: 800; font-size: 20px; letter-spacing: -.02em; white-space: nowrap; }
+  .logo b { color: var(--accent); }
+  .searchbox { flex: 1 1 340px; position: relative; min-width: 220px; }
+  .searchbox input { width: 100%; padding: 11px 14px 11px 40px; border-radius: 10px; border: 1px solid #2a3350; background: #121830; color: #fff; font-size: 15px; }
+  .searchbox input::placeholder { color: #8f9ab8; }
+  .searchbox span { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); opacity: .7; }
+  select.city { padding: 10px 12px; border-radius: 10px; border: 1px solid #2a3350; background: #121830; color: #fff; font-size: 14px; }
+  .cartbtn { background: var(--accent); color: #fff; border: 0; border-radius: 10px; padding: 10px 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .cartbtn:hover { background: var(--accent-dark); }
+  .cartbtn .n { background: #fff; color: var(--accent-dark); border-radius: 999px; min-width: 22px; padding: 0 6px; font-size: 13px; text-align: center; }
+  .status { display: flex; gap: 6px; flex-wrap: wrap; }
+  .svc { font-size: 12px; padding: 4px 9px; border-radius: 999px; background: #121830; border: 1px solid #2a3350; color: #c8d0e6; display: flex; align-items: center; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #6b7280; }
+  .dot.ok { background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,.2); }
+  .dot.bad { background: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,.2); }
+  .hints { max-width: 1440px; margin: 0 auto; padding: 0 20px 10px; font-size: 13px; color: #9aa5c4; }
+  .hints button { background: none; border: 0; color: #ffb27a; padding: 0 6px 0 0; text-decoration: underline; }
+
+  /* ---------- layout ---------- */
+  .layout { max-width: 1440px; margin: 0 auto; padding: 18px 20px 60px; display: grid; grid-template-columns: minmax(0,1fr) 410px; gap: 20px; align-items: start; }
+  @media (max-width: 1060px) { .layout { grid-template-columns: 1fr; } .pipeline { position: static !important; max-height: none !important; } }
+
+  .filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .chip { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 7px 14px; font-size: 14px; color: var(--ink); }
+  .chip.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .field { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); }
+  .field input[type=number] { width: 84px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+  .meta { display: flex; align-items: center; justify-content: space-between; margin: 6px 0 12px; font-size: 14px; color: var(--muted); gap: 10px; flex-wrap: wrap; }
+  .source { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
+  .source.os { background: #e6f7f5; color: #0b7a6e; }
+  .source.pg { background: #e8efff; color: #1d4ed8; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); display: flex; flex-direction: column; overflow: hidden; }
+  .card.flash { animation: flash 1.6s ease-out; }
+  @keyframes flash { 0% { box-shadow: 0 0 0 3px rgba(255,107,0,.7); } 100% { box-shadow: var(--shadow); } }
+  .thumb { height: 104px; display: grid; place-items: center; font-size: 52px; background: linear-gradient(135deg, #fff4ec, #eef2ff); }
+  .cbody { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .cat { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .card h3 { margin: 0; font-size: 15px; line-height: 1.3; }
+  .desc { margin: 0; font-size: 13px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .price { font-weight: 800; font-size: 17px; }
+  .stock { font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 999px; }
+  .stock.ok { background: #e7f6ee; color: #0c7a3d; }
+  .stock.low { background: #fff3d6; color: #8a5a00; }
+  .stock.out { background: #fde8e6; color: #b42318; }
+  .city-tag { font-size: 13px; color: var(--muted); }
+  .add { background: var(--ink); color: #fff; border: 0; border-radius: 9px; padding: 8px 12px; font-weight: 700; font-size: 13px; }
+  .add:hover { background: #20284a; }
+  .add:disabled { background: #cfd4e0; cursor: not-allowed; }
+  .restock { background: none; border: 1px dashed #b9c0d4; color: var(--muted); border-radius: 8px; font-size: 12px; padding: 3px 7px; }
+  .empty { background: var(--card); border: 1px dashed var(--line); border-radius: var(--radius); padding: 40px; text-align: center; color: var(--muted); grid-column: 1 / -1; }
+  .more { display: block; margin: 18px auto 0; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 10px 20px; font-weight: 700; }
+
+  /* ---------- pipeline panel ---------- */
+  .pipeline { position: sticky; top: 118px; background: var(--navy); color: #dfe5f7; border-radius: var(--radius); padding: 14px; max-height: calc(100vh - 140px); display: flex; flex-direction: column; box-shadow: var(--shadow); }
+  .pipeline h2 { margin: 0 0 2px; font-size: 16px; color: #fff; display: flex; justify-content: space-between; align-items: center; }
+  .pipeline h2 button { background: none; border: 1px solid #2a3350; color: #9aa5c4; border-radius: 8px; font-size: 12px; padding: 3px 8px; }
+  .pipeline .sub { font-size: 12px; color: #8f9ab8; margin-bottom: 10px; }
+  .log { overflow-y: auto; flex: 1; min-height: 160px; display: flex; flex-direction: column; gap: 7px; padding-right: 2px; }
+  .ev { background: #121830; border: 1px solid #222b49; border-left-width: 4px; border-radius: 9px; padding: 8px 10px; font-size: 12.5px; animation: slide .35s ease-out; }
+  @keyframes slide { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+  .ev .top { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: #8f9ab8; margin-bottom: 3px; }
+  .ev .who { font-weight: 800; letter-spacing: .02em; }
+  .ev .ref { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; color: #7f8bb0; margin-top: 3px; word-break: break-all; }
+  .s-api { border-left-color: #3b82f6; } .s-api .who { color: #7db0ff; }
+  .s-kafka { border-left-color: #ff6b00; } .s-kafka .who { color: #ffa466; }
+  .s-inv { border-left-color: #22c55e; } .s-inv .who { color: #6ee7a0; }
+  .s-note { border-left-color: #a855f7; } .s-note .who { color: #cfa0ff; }
+  .s-index { border-left-color: #14b8a6; } .s-index .who { color: #5eead4; }
+  .nolog { color: #8f9ab8; font-size: 13px; padding: 14px 4px; }
+  .demo { margin-top: 12px; padding-top: 12px; border-top: 1px solid #222b49; }
+  .demo h3 { margin: 0 0 6px; font-size: 13px; color: #fff; }
+  .demo p { margin: 0 0 8px; font-size: 12px; color: #8f9ab8; }
+  .race { width: 100%; background: var(--accent); color: #fff; border: 0; border-radius: 9px; padding: 10px; font-weight: 800; }
+  .race:disabled { opacity: .6; }
+  .raceout { margin-top: 8px; font-size: 13px; background: #121830; border: 1px solid #222b49; border-radius: 9px; padding: 9px 11px; display: none; }
+  .raceout .win { color: #6ee7a0; } .raceout .lose { color: #ff9a8f; }
+
+  /* ---------- cart drawer ---------- */
+  .scrim { position: fixed; inset: 0; background: rgba(9,13,22,.55); opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 40; }
+  .scrim.on { opacity: 1; pointer-events: auto; }
+  .drawer { position: fixed; top: 0; right: 0; height: 100%; width: min(440px, 100%); background: #fff; z-index: 50; transform: translateX(100%); transition: transform .25s ease; display: flex; flex-direction: column; box-shadow: -8px 0 30px rgba(0,0,0,.2); }
+  .drawer.on { transform: none; }
+  .dhead { padding: 16px 18px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
+  .dhead h2 { margin: 0; font-size: 18px; }
+  .x { background: none; border: 0; font-size: 22px; color: var(--muted); }
+  .dbody { padding: 14px 18px; overflow-y: auto; flex: 1; }
+  .line { display: grid; grid-template-columns: 44px 1fr auto; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .line .em { font-size: 30px; text-align: center; }
+  .line .nm { font-weight: 700; font-size: 14px; }
+  .line .sm { font-size: 12px; color: var(--muted); }
+  .qty { display: flex; align-items: center; gap: 6px; margin-top: 5px; }
+  .qty button { width: 26px; height: 26px; border-radius: 7px; border: 1px solid var(--line); background: #fff; font-weight: 800; }
+  .lt { font-weight: 800; }
+  .dfoot { border-top: 1px solid var(--line); padding: 14px 18px; display: grid; gap: 8px; }
+  .total { display: flex; justify-content: space-between; font-size: 17px; font-weight: 800; }
+  .dfoot input { padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; font-size: 14px; width: 100%; }
+  .primary { background: var(--accent); color: #fff; border: 0; border-radius: 10px; padding: 12px; font-weight: 800; font-size: 15px; }
+  .primary:hover { background: var(--accent-dark); } .primary:disabled { opacity: .6; cursor: wait; }
+  .err { color: var(--bad); font-size: 13px; min-height: 18px; }
+  .done { text-align: center; padding: 20px 6px; }
+  .done .big { font-size: 46px; }
+  .steps { text-align: left; margin: 16px auto 0; max-width: 330px; display: grid; gap: 9px; font-size: 14px; }
+  .step { display: flex; gap: 9px; align-items: center; color: var(--muted); }
+  .step i { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; font-style: normal; font-size: 12px; }
+  .step.on { color: var(--ink); } .step.on i { background: var(--ok); border-color: var(--ok); color: #fff; }
+
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px); background: var(--ink); color: #fff; padding: 11px 18px; border-radius: 10px; font-size: 14px; opacity: 0; pointer-events: none; transition: .25s; z-index: 80; max-width: 90vw; }
+  .toast.on { opacity: 1; transform: translate(-50%, 0); }
+  .toast.bad { background: var(--bad); }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="logo">Omni<b>Store</b></div>
+    <div class="searchbox">
+      <span aria-hidden="true">🔍</span>
+      <input id="q" type="search" placeholder="Search products. Typos are fine, try “bluetoth”" autocomplete="off" aria-label="Search products">
+    </div>
+    <select id="city" class="city" aria-label="City"><option value="">All cities</option></select>
+    <button id="cartBtn" class="cartbtn" aria-label="Open cart">🛒 Cart <span class="n" id="cartN">0</span></button>
+    <div class="status" id="status" aria-label="Service status"></div>
+  </div>
+  <div class="hints">Try:
+    <button data-q="bluetoth earphones">bluetoth earphones</button>
+    <button data-q="smartwach">smartwach</button>
+    <button data-q="yoga">yoga</button>
+    <button data-q="kurtha">kurtha</button>
+  </div>
+</header>
+
+<div class="layout">
+  <main>
+    <div class="filters">
+      <div id="chips" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+      <label class="field">₹ <input id="minP" type="number" min="0" placeholder="min"> – <input id="maxP" type="number" min="0" placeholder="max"></label>
+      <label class="field"><input id="inStock" type="checkbox"> In stock only</label>
+    </div>
+    <div class="meta"><span id="count">Loading…</span><span id="source"></span></div>
+    <div id="grid" class="grid"></div>
+    <button id="more" class="more" style="display:none">Show more</button>
+  </main>
+
+  <aside class="pipeline" aria-label="Live pipeline">
+    <h2>Live pipeline <button id="clearLog">Clear view</button></h2>
+    <div class="sub">Every order flows PostgreSQL → Kafka → consumers → OpenSearch. Watch it happen.</div>
+    <div class="log" id="log"><div class="nolog">Place an order or restock an item to see events appear here.</div></div>
+    <div class="demo" id="demo" style="display:none">
+      <h3>Demo tools</h3>
+      <p>Resets the Limited Edition Smartwatch (Bengaluru) to 1 unit, then two buyers press “Place order” at the same instant.</p>
+      <button class="race" id="raceBtn">⚡ Race: 2 buyers, 1 last item</button>
+      <div class="raceout" id="raceOut"></div>
+    </div>
+  </aside>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true" aria-label="Shopping cart">
+  <div class="dhead"><h2>Your cart</h2><button class="x" id="closeCart" aria-label="Close cart">×</button></div>
+  <div class="dbody" id="dbody"></div>
+  <div class="dfoot" id="dfoot"></div>
+</aside>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  'use strict';
+  const $ = (s, el) => (el || document).querySelector(s);
+  const inr = n => '₹' + Number(n).toLocaleString('en-IN');
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const store = {
+    get: k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } },
+    set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* private mode */ } },
+  };
+
+  const state = { q: '', category: '', city: '', minP: '', maxP: '', inStock: false, page: 1,
+                  total: 0, items: [], cartId: store.get('omnistore_cart'), cart: null,
+                  lastLogId: 0, demo: false, stock: {}, orderTimer: null };
+
+  async function api(path, opts) {
+    const res = await fetch(path, Object.assign({ headers: { 'Content-Type': 'application/json' } }, opts));
+    let data = {};
+    try { data = await res.json(); } catch (e) { /* empty body */ }
+    if (!res.ok) {
+      let msg = data.detail || res.statusText;
+      if (Array.isArray(msg)) msg = msg.map(m => (m.loc ? m.loc[m.loc.length - 1] + ': ' : '') + m.msg).join('; ');
+      const err = new Error(msg); err.status = res.status; err.data = data; throw err;
+    }
+    return data;
+  }
+
+  let toastTimer;
+  function toast(msg, bad) {
+    const t = $('#toast'); t.textContent = msg; t.className = 'toast on' + (bad ? ' bad' : '');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.className = 'toast' + (bad ? ' bad' : ''); }, 3200);
+  }
+
+  /* ---------------- results ---------------- */
+  function query() {
+    const p = new URLSearchParams();
+    if (state.q) p.set('q', state.q);
+    if (state.category) p.set('category', state.category);
+    if (state.city) p.set('city', state.city);
+    if (state.minP !== '') p.set('min_price', state.minP);
+    if (state.maxP !== '') p.set('max_price', state.maxP);
+    if (state.inStock) p.set('in_stock', 'true');
+    p.set('page', state.page); p.set('size', 24);
+    return p.toString();
+  }
+
+  let reqId = 0;
+  async function load(opts) {
+    opts = opts || {};
+    if (!opts.append && !opts.silent) state.page = 1;
+    const id = ++reqId;
+    try {
+      const data = await api((state.q ? '/api/search?' : '/api/products?') + query());
+      if (id !== reqId) return; // a newer request already won
+      state.total = data.total;
+      state.items = opts.append ? state.items.concat(data.items) : data.items;
+      renderGrid(opts.silent);
+      const os = data.source === 'opensearch';
+      $('#count').textContent = data.total + (data.total === 1 ? ' result' : ' results') + (state.q ? ' for “' + state.q + '”' : '');
+      $('#source').innerHTML = '<span class="source ' + (os ? 'os' : 'pg') + '">' + (os ? 'from OpenSearch' : 'from PostgreSQL') +
+        ' · ' + (data.took_ms == null ? '?' : data.took_ms) + ' ms</span>';
+    } catch (e) {
+      if (id !== reqId) return;
+      state.items = []; renderGrid();
+      $('#count').textContent = e.message; $('#source').innerHTML = '';
+    }
+  }
+
+  function renderGrid(silent) {
+    const grid = $('#grid');
+    if (!state.items.length) {
+      grid.innerHTML = '<div class="empty">Nothing matches. Try a different word or clear a filter.</div>';
+      $('#more').style.display = 'none'; return;
+    }
+    grid.innerHTML = state.items.map(it => {
+      const s = it.stock, cls = s === 0 ? 'out' : s <= 5 ? 'low' : 'ok';
+      const label = s === 0 ? 'Sold out' : s <= 5 ? 'Only ' + s + ' left' : s + ' in stock';
+      const changed = silent && state.stock[it.listing_id] !== undefined && state.stock[it.listing_id] !== s;
+      return '<article class="card' + (changed ? ' flash' : '') + '">' +
+        '<div class="thumb" aria-hidden="true">' + esc(it.emoji) + '</div>' +
+        '<div class="cbody"><div class="cat">' + esc(it.category) + '</div>' +
+        '<h3>' + esc(it.name) + '</h3><p class="desc">' + esc(it.description) + '</p>' +
+        '<div class="row"><span class="price">' + inr(it.price) + '</span><span class="stock ' + cls + '">' + label + '</span></div>' +
+        '<div class="row"><span class="city-tag">📍 ' + esc(it.city) + '</span>' +
+        (state.demo ? '<button class="restock" data-a="restock" data-pid="' + it.product_id + '" data-city="' + esc(it.city) + '" title="Demo: add 10 units">+10</button>' : '') +
+        '<button class="add" data-a="add" data-pid="' + it.product_id + '" data-city="' + esc(it.city) + '"' + (s === 0 ? ' disabled' : '') + '>' + (s === 0 ? 'Sold out' : 'Add to cart') + '</button></div>' +
+        '</div></article>';
+    }).join('');
+    state.stock = {}; state.items.forEach(it => { state.stock[it.listing_id] = it.stock; });
+    $('#more').style.display = state.items.length < state.total ? 'block' : 'none';
+  }
+
+  /* ---------------- filters ---------------- */
+  async function loadFacets() {
+    try {
+      const f = await api('/api/facets');
+      $('#city').innerHTML = '<option value="">All cities</option>' + f.cities.map(c => '<option>' + esc(c) + '</option>').join('');
+      const chips = ['All'].concat(f.categories);
+      $('#chips').innerHTML = chips.map((c, i) => '<button class="chip' + (i === 0 ? ' on' : '') + '" data-cat="' + (i === 0 ? '' : esc(c)) + '">' + esc(c) + '</button>').join('');
+    } catch (e) { toast('Could not load filters: ' + e.message, true); }
+  }
+  let debounce;
+  function reloadSoon() { clearTimeout(debounce); debounce = setTimeout(load, 250); }
+
+  $('#q').addEventListener('input', e => { state.q = e.target.value.trim(); reloadSoon(); });
+  $('#city').addEventListener('change', e => { state.city = e.target.value; load(); });
+  $('#minP').addEventListener('input', e => { state.minP = e.target.value; reloadSoon(); });
+  $('#maxP').addEventListener('input', e => { state.maxP = e.target.value; reloadSoon(); });
+  $('#inStock').addEventListener('change', e => { state.inStock = e.target.checked; load(); });
+  $('#more').addEventListener('click', () => { state.page += 1; load({ append: true }); });
+  $('#chips').addEventListener('click', e => {
+    const b = e.target.closest('.chip'); if (!b) return;
+    state.category = b.dataset.cat;
+    document.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b));
+    load();
+  });
+  document.querySelector('.hints').addEventListener('click', e => {
+    const b = e.target.closest('button[data-q]'); if (!b) return;
+    $('#q').value = b.dataset.q; state.q = b.dataset.q; load();
+  });
+
+  /* ---------------- cart ---------------- */
+  async function ensureCart() {
+    if (state.cartId) {
+      try { const c = await api('/api/carts/' + state.cartId); if (c.status === 'open') { state.cart = c; return; } } catch (e) { /* fall through */ }
+    }
+    const r = await api('/api/carts', { method: 'POST' });
+    state.cartId = r.cart_id; store.set('omnistore_cart', state.cartId);
+    state.cart = await api('/api/carts/' + state.cartId);
+  }
+
+  function renderCartBadge() { $('#cartN').textContent = state.cart ? state.cart.count : 0; }
+
+  async function addToCart(pid, city) {
+    try {
+      await ensureCart();
+      state.cart = await api('/api/carts/' + state.cartId + '/items', { method: 'POST', body: JSON.stringify({ product_id: +pid, city: city, qty: 1 }) });
+      renderCartBadge(); toast('Added to cart');
+    } catch (e) { toast(e.message, true); }
+  }
+
+  async function changeQty(pid, city, delta) {
+    try {
+      state.cart = await api('/api/carts/' + state.cartId + '/items', { method: 'POST', body: JSON.stringify({ product_id: +pid, city: city, qty: delta }) });
+      renderCartBadge(); renderCart();
+    } catch (e) { toast(e.message, true); }
+  }
+
+  function renderCart(msg) {
+    const c = state.cart, body = $('#dbody'), foot = $('#dfoot');
+    if (!c || !c.items.length) {
+      body.innerHTML = '<div class="empty" style="margin-top:20px">Your cart is empty.</div>'; foot.innerHTML = ''; return;
+    }
+    body.innerHTML = c.items.map(i =>
+      '<div class="line"><div class="em">' + esc(i.emoji) + '</div><div><div class="nm">' + esc(i.name) + '</div>' +
+      '<div class="sm">📍 ' + esc(i.city) + ' · ' + inr(i.price) + ' each</div>' +
+      '<div class="qty"><button data-a="dec" data-pid="' + i.product_id + '" data-city="' + esc(i.city) + '" aria-label="Remove one">−</button>' +
+      '<span>' + i.qty + '</span><button data-a="inc" data-pid="' + i.product_id + '" data-city="' + esc(i.city) + '" aria-label="Add one">+</button></div></div>' +
+      '<div class="lt">' + inr(i.line_total) + '</div></div>').join('');
+    foot.innerHTML =
+      '<div class="total"><span>Total</span><span>' + inr(c.total) + '</span></div>' +
+      '<input id="cname" placeholder="Your name" autocomplete="name" value="' + esc(store.get('omnistore_name')) + '">' +
+      '<input id="cemail" type="email" placeholder="Email for the confirmation" autocomplete="email" value="' + esc(store.get('omnistore_email')) + '">' +
+      '<div class="err" id="cerr">' + esc(msg || '') + '</div>' +
+      '<button class="primary" id="place">Place order</button>';
+  }
+
+  async function openCart() {
+    $('#drawer').classList.add('on'); $('#scrim').classList.add('on'); $('#drawer').setAttribute('aria-hidden', 'false');
+    try { await ensureCart(); } catch (e) { toast(e.message, true); }
+    renderCartBadge(); renderCart();
+  }
+  function closeCart() { $('#drawer').classList.remove('on'); $('#scrim').classList.remove('on'); $('#drawer').setAttribute('aria-hidden', 'true'); }
+  $('#cartBtn').addEventListener('click', openCart);
+  $('#closeCart').addEventListener('click', closeCart);
+  $('#scrim').addEventListener('click', closeCart);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCart(); });
+
+  $('#dbody').addEventListener('click', e => {
+    const b = e.target.closest('button[data-a]'); if (!b) return;
+    changeQty(b.dataset.pid, b.dataset.city, b.dataset.a === 'inc' ? 1 : -1);
+  });
+
+  $('#dfoot').addEventListener('click', async e => {
+    if (!e.target.closest('#place')) return;
+    const name = $('#cname').value.trim(), email = $('#cemail').value.trim();
+    if (!name || !email) { $('#cerr').textContent = 'Please enter your name and email.'; return; }
+    store.set('omnistore_name', name); store.set('omnistore_email', email);
+    const btn = $('#place'); btn.disabled = true; btn.textContent = 'Placing order…';
+    try {
+      const order = await api('/api/orders', { method: 'POST', body: JSON.stringify({ cart_id: state.cartId, customer_name: name, customer_email: email }) });
+      showOrder(order);
+      state.cartId = ''; store.set('omnistore_cart', ''); state.cart = null; renderCartBadge();
+      load({ silent: true });
+    } catch (err) {
+      btn.disabled = false; btn.textContent = 'Place order';
+      if (err.status === 409) { // someone bought it first: show the truth
+        try { state.cart = await api('/api/carts/' + state.cartId); } catch (x) { /* ignore */ }
+        renderCartBadge(); renderCart(err.message); load({ silent: true });
+      } else { $('#cerr').textContent = err.message; }
+    }
+  });
+
+  function showOrder(order) {
+    $('#dfoot').innerHTML = '<button class="primary" id="keep">Continue shopping</button>';
+    $('#keep').onclick = () => { clearInterval(state.orderTimer); closeCart(); };
+    $('#dbody').innerHTML = '<div class="done"><div class="big">🎉</div><h2 style="margin:6px 0">Order #' + order.order_id + ' placed</h2>' +
+      '<div style="color:#5d667a">Total ' + inr(order.total) + ' · confirmation to ' + esc(order.customer.email) + '</div>' +
+      '<div class="steps" id="steps">' +
+      '<div class="step on"><i>✓</i>Saved in PostgreSQL, stock reserved</div>' +
+      '<div class="step" id="st-kafka"><i></i>Event published to Kafka</div>' +
+      '<div class="step" id="st-conf"><i></i>Order confirmed by the inventory consumer</div>' +
+      '<div class="step" id="st-mail"><i></i>Confirmation email sent</div></div></div>';
+    let tries = 0; clearInterval(state.orderTimer);
+    state.orderTimer = setInterval(async () => {
+      tries += 1; if (tries > 30) clearInterval(state.orderTimer);
+      try {
+        const o = await api('/api/orders/' + order.order_id);
+        const on = id => { const el = $(id); if (el) { el.classList.add('on'); el.firstChild.textContent = '✓'; } };
+        if (o.status === 'confirmed') { on('#st-kafka'); on('#st-conf'); }
+        if (o.notifications.length) { on('#st-kafka'); on('#st-mail'); }
+        if (o.status === 'confirmed' && o.notifications.length) clearInterval(state.orderTimer);
+      } catch (e) { /* keep trying */ }
+    }, 1000);
+  }
+
+  /* ---------------- live pipeline ---------------- */
+  const SERVICES = {
+    'api': ['API · PostgreSQL', 's-api'], 'kafka': ['Kafka', 's-kafka'],
+    'inventory-consumer': ['Inventory consumer', 's-inv'], 'notification-consumer': ['Notification consumer', 's-note'],
+    'search-indexer': ['Search indexer · OpenSearch', 's-index'],
+  };
+  function addEvent(e) {
+    const log = $('#log'); const nolog = $('.nolog', log); if (nolog) nolog.remove();
+    const s = SERVICES[e.service] || [e.service, 's-api'];
+    const t = new Date(e.ts).toLocaleTimeString([], { hour12: false });
+    const div = document.createElement('div'); div.className = 'ev ' + s[1];
+    div.innerHTML = '<div class="top"><span class="who">' + esc(s[0]) + '</span><span>' + esc(t) + '</span></div>' +
+      '<div>' + esc(e.action) + '</div>' + (e.ref ? '<div class="ref">' + esc(e.event_type) + ' · ' + esc(e.ref) + '</div>' : '');
+    log.prepend(div);
+    while (log.children.length > 80) log.lastChild.remove();
+  }
+  async function pollPipeline() {
+    try {
+      const data = await api('/api/pipeline?after_id=' + state.lastLogId);
+      let refresh = false;
+      data.events.forEach(e => { addEvent(e); state.lastLogId = Math.max(state.lastLogId, e.id); if (e.service === 'search-indexer') refresh = true; });
+      if (refresh && state.initialLogDone) load({ silent: true }); // the index changed: show fresh stock
+      state.initialLogDone = true;
+    } catch (e) { /* server restarting: try again */ }
+  }
+  $('#clearLog').addEventListener('click', () => { $('#log').innerHTML = '<div class="nolog">Cleared. New events will appear here.</div>'; });
+
+  /* ---------------- demo tools ---------------- */
+  $('#grid').addEventListener('click', async e => {
+    const b = e.target.closest('button[data-a]'); if (!b) return;
+    if (b.dataset.a === 'add') addToCart(b.dataset.pid, b.dataset.city);
+    if (b.dataset.a === 'restock') {
+      try { await api('/api/demo/restock', { method: 'POST', body: JSON.stringify({ product_id: +b.dataset.pid, city: b.dataset.city, qty: 10 }) }); toast('Restocked +10: watch the pipeline'); }
+      catch (err) { toast(err.message, true); }
+    }
+  });
+
+  $('#raceBtn').addEventListener('click', async () => {
+    const btn = $('#raceBtn'), out = $('#raceOut'); btn.disabled = true; btn.textContent = 'Racing…';
+    try {
+      const r = await api('/api/demo/race', { method: 'POST', body: JSON.stringify({}) });
+      out.style.display = 'block';
+      out.innerHTML = '<b>' + esc(r.product) + ' · ' + esc(r.city) + '</b> (1 unit)<br>' +
+        r.results.map(x => x.result === 'won' ? '<span class="win">✓ ' + esc(x.buyer) + ' got it (order #' + x.order_id + ')</span>' : '<span class="lose">✗ ' + esc(x.buyer) + ': sold out</span>').join('<br>') +
+        '<br>Stock now <b>' + r.final_stock + '</b>. ' + (r.oversold ? '<span class="lose">OVERSOLD</span>' : '<span class="win">No overselling ✓</span>');
+      load({ silent: true });
+    } catch (e) { toast(e.message, true); }
+    btn.disabled = false; btn.textContent = '⚡ Race: 2 buyers, 1 last item';
+  });
+
+  /* ---------------- service status ---------------- */
+  async function loadHealth() {
+    try {
+      const h = await api('/api/health');
+      const names = { postgresql: 'PostgreSQL', kafka: 'Kafka', opensearch: 'OpenSearch' };
+      $('#status').innerHTML = Object.keys(names).map(k => {
+        const v = h[k], tip = v.ok ? v.ms + ' ms' : (v.error || 'unreachable');
+        return '<span class="svc" title="' + esc(tip) + '"><span class="dot ' + (v.ok ? 'ok' : 'bad') + '"></span>' + names[k] + '</span>';
+      }).join('');
+    } catch (e) { $('#status').innerHTML = '<span class="svc"><span class="dot bad"></span>API unreachable</span>'; }
+  }
+
+  /* ---------------- start ---------------- */
+  async function start() {
+    try { const c = await api('/api/config'); state.demo = !!c.demo_mode; $('#demo').style.display = state.demo ? 'block' : 'none'; } catch (e) { /* ignore */ }
+    await loadFacets();
+    await load();
+    try { await ensureCart(); renderCartBadge(); } catch (e) { /* cart is created on first use */ }
+    loadHealth(); setInterval(() => { if (!document.hidden) loadHealth(); }, 15000);
+    pollPipeline(); setInterval(() => { if (!document.hidden) pollPipeline(); }, 1200);
+  }
+  start();
+})();
+</script>
+</body>
+</html>
